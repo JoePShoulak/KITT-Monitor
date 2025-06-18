@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
             KITTMonitorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
-                        name = "Android",
+                        name = "Joe",
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
