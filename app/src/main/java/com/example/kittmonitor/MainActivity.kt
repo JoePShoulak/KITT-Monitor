@@ -1,12 +1,14 @@
 package com.example.kittmonitor
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -28,6 +30,7 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
 
+    @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -53,59 +56,24 @@ class MainActivity : ComponentActivity() {
                             .padding(padding),
                         contentAlignment = Alignment.Center
                     ) {
-                        Button(
+                        ConnectButton(
+                            connected = connected,
+                            scanning = scanning,
                             onClick = {
-                                if (!hasPermission()) return@Button
+                                if (!hasPermission()) return@ConnectButton
                                 scanning = true
-                                scanCallback = object : ScanCallback() {
-                                    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
-                                    override fun onScanResult(type: Int, result: ScanResult) {
-                                        if (!hasPermission()) return
-                                        val name = result.device.name ?: ""
-                                        if (name == "KITT") {
-                                            scanner?.stopScan(this)
-                                            scanning = false
-                                            val currentContext = this@MainActivity
-                                            gatt = result.device.connectGatt(currentContext, false, object : BluetoothGattCallback() {
-                                                override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-                                                    if (newState == BluetoothProfile.STATE_CONNECTED && hasPermission()) {
-                                                        g.discoverServices()
-                                                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                                                        runOnUiThread {
-                                                            connected = false
-                                                            scanning = false
-                                                        }
-                                                    }
-                                                }
-
-                                                override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                                                    if (status == BluetoothGatt.GATT_SUCCESS && hasPermission()) {
-                                                        gatt.services.forEach { service ->
-                                                            android.util.Log.d("KITTMonitor", "Service: ${service.uuid}")
-                                                        }
-                                                        runOnUiThread {
-                                                            connected = true
-                                                            scanning = false
-                                                        }
-                                                    }
-                                                }
-                                            })
-                                        }
+                                startScan(
+                                    onDeviceFound = {
+                                        scanning = false
+                                        connected = true
+                                    },
+                                    onDisconnected = {
+                                        connected = false
+                                        scanning = false
                                     }
-                                }
-                                scanner?.startScan(scanCallback)
-                            },
-                            enabled = !connected && !scanning,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                        ) {
-                            Text(
-                                when {
-                                    connected -> "Connected"
-                                    scanning -> "Searching..."
-                                    else -> "Connect to KITT"
-                                }
-                            )
-                        }
+                                )
+                            }
+                        )
                     }
                 }
             }
@@ -126,5 +94,63 @@ class MainActivity : ComponentActivity() {
 
         val missing = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1)
+    }
+
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
+    private fun startScan(onDeviceFound: () -> Unit, onDisconnected: () -> Unit) {
+        scanCallback = object : ScanCallback() {
+            @SuppressLint("MissingPermission")
+            override fun onScanResult(type: Int, result: ScanResult) {
+                if (!hasPermission()) return
+                if (result.device.name == "KITT") {
+                    scanner?.stopScan(this)
+                    val currentContext = this@MainActivity
+                    gatt = result.device.connectGatt(currentContext, false, object : BluetoothGattCallback() {
+                        override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+                            Log.d("KITTMonitor", "onConnectionStateChange: status=$status, newState=$newState")
+                            if (newState == BluetoothProfile.STATE_CONNECTED && hasPermission()) {
+                                g.discoverServices()
+                            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                                runOnUiThread { onDisconnected() }
+                            }
+                        }
+
+                        override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                            Log.d("KITTMonitor", "onServicesDiscovered: status=$status")
+                            if (status == BluetoothGatt.GATT_SUCCESS && hasPermission()) {
+                                gatt.services.forEach { service ->
+                                    Log.d("KITTMonitor", "Service: ${service.uuid}")
+                                    service.characteristics.forEach { characteristic ->
+                                        Log.d("KITTMonitor", "Characteristic: ${characteristic.uuid}")
+                                    }
+
+                                }
+                                runOnUiThread { onDeviceFound() }
+                            } else {
+                                Log.e("KITTMonitor", "Service discovery failed with status $status")
+                            }
+                        }
+                    })
+                }
+            }
+        }
+        scanner?.startScan(scanCallback)
+    }
+}
+
+@Composable
+fun ConnectButton(connected: Boolean, scanning: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = !connected && !scanning,
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+    ) {
+        Text(
+            when {
+                connected -> "Connected"
+                scanning -> "Searching..."
+                else -> "Connect to KITT"
+            }
+        )
     }
 }
