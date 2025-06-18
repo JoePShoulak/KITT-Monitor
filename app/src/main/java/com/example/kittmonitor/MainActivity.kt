@@ -3,7 +3,6 @@ package com.example.kittmonitor
 import android.Manifest
 import android.bluetooth.*
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.pm.PackageManager
@@ -14,12 +13,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -27,7 +28,8 @@ import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
-    private val status = mutableStateOf("Scanning for device...")
+    private val status = mutableStateOf("Scanning for devices...")
+    private val devices = mutableStateListOf<String>()
     private val bluetoothManager by lazy { getSystemService(BLUETOOTH_SERVICE) as BluetoothManager }
     private val bluetoothAdapter get() = bluetoothManager.adapter
     private var bluetoothGatt: BluetoothGatt? = null
@@ -45,10 +47,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             KITTMonitorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Text(
-                        text = status.value,
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    Column(modifier = Modifier.padding(innerPadding)) {
+                        Text(text = status.value)
+                        devices.forEach { device ->
+                            Text(text = device)
+                        }
+                    }
                 }
             }
         }
@@ -87,19 +91,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startScan() {
-        status.value = "Scanning for device..."
-        val filter = ScanFilter.Builder().setDeviceName(BleConstants.DEVICE_NAME).build()
+        status.value = "Scanning for devices..."
+        devices.clear()
         val settings = ScanSettings.Builder().build()
-        bluetoothAdapter.bluetoothLeScanner.startScan(listOf(filter), settings, scanCallback)
+        bluetoothAdapter.bluetoothLeScanner.startScan(null, settings, scanCallback)
     }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            if (result.device.name == BleConstants.DEVICE_NAME) {
-                status.value = "Device found, connecting..."
-                bluetoothAdapter.bluetoothLeScanner.stopScan(this)
-                result.device.connectGatt(this@MainActivity, false, gattCallback)
+            val name = result.device.name ?: "Unnamed"
+            val entry = "$name [${result.device.address}]"
+            if (entry !in devices) {
+                devices.add(entry)
             }
+            status.value = "Found ${devices.size} device(s)"
         }
     }
 
@@ -150,8 +155,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 @Preview(showBackground = true)
 fun GreetingPreview() {
-    val state = remember { mutableStateOf("Preview") }
+    val devices = remember { mutableStateListOf("Device A", "Device B") }
+    val state = remember { mutableStateOf("Scanning for devices...") }
     KITTMonitorTheme {
-        Text(text = state.value)
+        Column {
+            Text(text = state.value)
+            devices.forEach { Text(text = it) }
+        }
     }
 }
