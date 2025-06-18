@@ -4,20 +4,24 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 
 class MainActivity : ComponentActivity() {
@@ -32,6 +36,10 @@ class MainActivity : ComponentActivity() {
 
         requestPermissionsIfNeeded()
 
+        val requestEnableBluetooth = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            // This block is called when the user returns from the Bluetooth enable prompt
+        }
+
         setContent {
             val bluetoothStatus = remember { mutableStateOf(getBluetoothStatus()) }
 
@@ -44,10 +52,26 @@ class MainActivity : ComponentActivity() {
 
             KITTMonitorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        status = bluetoothStatus.value,
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Greeting(status = bluetoothStatus.value)
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (bluetoothStatus.value.contains("OFF")) {
+                            Button(onClick = {
+                                val intent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                                requestEnableBluetooth.launch(intent)
+                            }) {
+                                Text("Enable Bluetooth")
+                            }
+                        }
+                    }
                 }
             }
         }
