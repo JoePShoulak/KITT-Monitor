@@ -3,6 +3,9 @@ package com.example.kittmonitor
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -26,6 +29,8 @@ import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var bluetoothAdapter: BluetoothAdapter
+    private var bluetoothLeScanner: BluetoothLeScanner? = null
+    private var scanCallback: ScanCallback? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,15 +38,18 @@ class MainActivity : ComponentActivity() {
 
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
+        bluetoothLeScanner = bluetoothAdapter.bluetoothLeScanner
 
         requestPermissionsIfNeeded()
 
         val requestEnableBluetooth = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            // This block is called when the user returns from the Bluetooth enable prompt
+            // User returned from enable Bluetooth dialog
         }
 
         setContent {
             val bluetoothStatus = remember { mutableStateOf(getBluetoothStatus()) }
+            var isScanning by remember { mutableStateOf(false) }
+            var foundKITT by remember { mutableStateOf(false) }
 
             LaunchedEffect(Unit) {
                 while (true) {
@@ -63,12 +71,54 @@ class MainActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        Text(text = if (foundKITT) "✅ KITT found!" else "🔍 Looking for KITT...")
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         if (bluetoothStatus.value.contains("OFF")) {
                             Button(onClick = {
                                 val intent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                                 requestEnableBluetooth.launch(intent)
                             }) {
                                 Text("Enable Bluetooth")
+                            }
+                        } else {
+                            Button(onClick = {
+                                if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
+                                    checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                                    return@Button
+                                }
+
+                                if (isScanning) {
+                                    bluetoothLeScanner?.stopScan(scanCallback)
+                                } else {
+                                    foundKITT = false
+                                    scanCallback = object : ScanCallback() {
+                                        override fun onScanResult(callbackType: Int, result: ScanResult) {
+                                            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
+                                                checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                                                return
+                                            }
+
+                                            val name = result.device.name ?: "Unnamed"
+                                            if (name == "KITT") {
+                                                foundKITT = true
+                                                bluetoothLeScanner?.stopScan(this)
+                                                isScanning = false
+                                            }
+                                        }
+                                    }
+                                    bluetoothLeScanner?.startScan(scanCallback)
+                                }
+                                isScanning = !isScanning
+                            }) {
+                                Text(
+                                    when {
+                                        foundKITT -> "Restart Scan"
+                                        isScanning -> "Stop Scan"
+                                        else -> "Start Scan"
+                                    }
+                                )
                             }
                         }
                     }
