@@ -1,7 +1,6 @@
 package com.example.kittmonitor
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
@@ -12,11 +11,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresPermission
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
@@ -27,7 +28,6 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
 
-    @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -42,16 +42,21 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var connected by remember { mutableStateOf(false) }
+            var scanning by remember { mutableStateOf(false) }
 
             KITTMonitorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
                     Box(
-                        modifier = Modifier.fillMaxSize().padding(padding),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black)
+                            .padding(padding),
                         contentAlignment = Alignment.Center
                     ) {
                         Button(
                             onClick = {
                                 if (!hasPermission()) return@Button
+                                scanning = true
                                 scanCallback = object : ScanCallback() {
                                     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
                                     override fun onScanResult(type: Int, result: ScanResult) {
@@ -59,12 +64,29 @@ class MainActivity : ComponentActivity() {
                                         val name = result.device.name ?: ""
                                         if (name == "KITT") {
                                             scanner?.stopScan(this)
-                                            gatt = result.device.connectGatt(this@MainActivity, false, object : BluetoothGattCallback() {
+                                            scanning = false
+                                            val currentContext = this@MainActivity
+                                            gatt = result.device.connectGatt(currentContext, false, object : BluetoothGattCallback() {
                                                 override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
                                                     if (newState == BluetoothProfile.STATE_CONNECTED && hasPermission()) {
-                                                        connected = true
+                                                        g.discoverServices()
                                                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                                                        connected = false
+                                                        runOnUiThread {
+                                                            connected = false
+                                                            scanning = false
+                                                        }
+                                                    }
+                                                }
+
+                                                override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                                                    if (status == BluetoothGatt.GATT_SUCCESS && hasPermission()) {
+                                                        gatt.services.forEach { service ->
+                                                            android.util.Log.d("KITTMonitor", "Service: ${service.uuid}")
+                                                        }
+                                                        runOnUiThread {
+                                                            connected = true
+                                                            scanning = false
+                                                        }
                                                     }
                                                 }
                                             })
@@ -73,9 +95,16 @@ class MainActivity : ComponentActivity() {
                                 }
                                 scanner?.startScan(scanCallback)
                             },
-                            enabled = !connected
+                            enabled = !connected && !scanning,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                         ) {
-                            Text(if (connected) "Connected" else "Connect to KITT")
+                            Text(
+                                when {
+                                    connected -> "Connected"
+                                    scanning -> "Searching..."
+                                    else -> "Connect to KITT"
+                                }
+                            )
                         }
                     }
                 }
