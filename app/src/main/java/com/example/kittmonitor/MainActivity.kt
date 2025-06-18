@@ -1,125 +1,81 @@
 package com.example.kittmonitor
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
-import android.bluetooth.le.BluetoothLeScanner
-import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanResult
+import android.annotation.SuppressLint
+import android.bluetooth.*
+import android.bluetooth.le.*
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var bluetoothAdapter: BluetoothAdapter
-    private var bluetoothLeScanner: BluetoothLeScanner? = null
+    private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
+    private var gatt: BluetoothGatt? = null
 
+    @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        bluetoothAdapter = bluetoothManager.adapter
-        bluetoothLeScanner = bluetoothAdapter.bluetoothLeScanner
+        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothAdapter = manager.adapter
+        if (hasPermission()) {
+            scanner = bluetoothAdapter.bluetoothLeScanner
+        }
 
         requestPermissionsIfNeeded()
 
-        val requestEnableBluetooth = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            // User returned from enable Bluetooth dialog
-        }
-
         setContent {
-            val bluetoothStatus = remember { mutableStateOf(getBluetoothStatus()) }
-            var isScanning by remember { mutableStateOf(false) }
-            var foundKITT by remember { mutableStateOf(false) }
-
-            LaunchedEffect(Unit) {
-                while (true) {
-                    bluetoothStatus.value = getBluetoothStatus()
-                    kotlinx.coroutines.delay(1000)
-                }
-            }
+            var connected by remember { mutableStateOf(false) }
 
             KITTMonitorTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(padding),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Greeting(status = bluetoothStatus.value)
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Text(text = if (foundKITT) "✅ KITT found!" else "🔍 Looking for KITT...")
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        if (bluetoothStatus.value.contains("OFF")) {
-                            Button(onClick = {
-                                val intent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                                requestEnableBluetooth.launch(intent)
-                            }) {
-                                Text("Enable Bluetooth")
-                            }
-                        } else {
-                            Button(onClick = {
-                                if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-                                    checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                                    return@Button
-                                }
-
-                                if (isScanning) {
-                                    bluetoothLeScanner?.stopScan(scanCallback)
-                                } else {
-                                    foundKITT = false
-                                    scanCallback = object : ScanCallback() {
-                                        override fun onScanResult(callbackType: Int, result: ScanResult) {
-                                            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED ||
-                                                checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                                                return
-                                            }
-
-                                            val name = result.device.name ?: "Unnamed"
-                                            if (name == "KITT") {
-                                                foundKITT = true
-                                                bluetoothLeScanner?.stopScan(this)
-                                                isScanning = false
-                                            }
+                        Button(
+                            onClick = {
+                                if (!hasPermission()) return@Button
+                                scanCallback = object : ScanCallback() {
+                                    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
+                                    override fun onScanResult(type: Int, result: ScanResult) {
+                                        if (!hasPermission()) return
+                                        val name = result.device.name ?: ""
+                                        if (name == "KITT") {
+                                            scanner?.stopScan(this)
+                                            gatt = result.device.connectGatt(this@MainActivity, false, object : BluetoothGattCallback() {
+                                                override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+                                                    if (newState == BluetoothProfile.STATE_CONNECTED && hasPermission()) {
+                                                        connected = true
+                                                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                                                        connected = false
+                                                    }
+                                                }
+                                            })
                                         }
                                     }
-                                    bluetoothLeScanner?.startScan(scanCallback)
                                 }
-                                isScanning = !isScanning
-                            }) {
-                                Text(
-                                    when {
-                                        foundKITT -> "Restart Scan"
-                                        isScanning -> "Stop Scan"
-                                        else -> "Start Scan"
-                                    }
-                                )
-                            }
+                                scanner?.startScan(scanCallback)
+                            },
+                            enabled = !connected
+                        ) {
+                            Text(if (connected) "Connected" else "Connect to KITT")
                         }
                     }
                 }
@@ -127,42 +83,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun getBluetoothStatus(): String {
-        return if (bluetoothAdapter.isEnabled) {
-            "Bluetooth is ON"
-        } else {
-            "Bluetooth is OFF. Please enable it."
-        }
+    private fun hasPermission(): Boolean {
+        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        else arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION)
+        return perms.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
     }
 
     private fun requestPermissionsIfNeeded() {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-        }
+        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        else arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.ACCESS_FINE_LOCATION)
 
-        val missingPermissions = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (missingPermissions.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), 1)
-        }
+        val missing = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1)
     }
-}
-
-@Composable
-fun Greeting(status: String, modifier: Modifier = Modifier) {
-    Text(
-        text = status,
-        modifier = modifier
-    )
 }
