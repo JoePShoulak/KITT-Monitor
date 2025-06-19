@@ -340,7 +340,7 @@ class MainActivity : ComponentActivity() {
     private fun saveLogsToFile() {
         val text = logMessages.joinToString("\n") { it.text }
         val baseDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val dir = File(baseDir, "KITT Logs")
+        val dir = File(baseDir, "Kitt_Folder")
         if (!dir.exists()) dir.mkdirs()
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
         val file = File(dir, "log_${timestamp}.txt")
@@ -375,11 +375,11 @@ class MainActivity : ComponentActivity() {
 
     private fun openLogsDirectory() {
         val baseDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val dir = File(baseDir, "KITT Logs")
+        val dir = File(baseDir, "Kitt_Folder")
         if (!dir.exists()) dir.mkdirs()
         val uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "resource/folder")
+            setDataAndType(uri, "*/*")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         try {
