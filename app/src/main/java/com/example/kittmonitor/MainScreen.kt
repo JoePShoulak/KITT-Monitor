@@ -23,7 +23,6 @@ import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 @Composable
 fun MainScreen(
     isConnectedState: MutableState<Boolean>,
-    statusTextState: MutableState<String>,
     logMessages: MutableList<AnnotatedString>,
     followBottomState: MutableState<Boolean>,
     bluetoothAdapter: BluetoothAdapter,
@@ -79,11 +78,13 @@ fun MainScreen(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = statusTextState.value,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (isConnectedState.value) {
+                            Text(
+                                text = "KITT Monitor",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier.weight(1f),
@@ -105,7 +106,20 @@ fun MainScreen(
                         modifier = Modifier.weight(1f)
                     )
                 } else {
-                    Spacer(modifier = Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        /* TODO: Replace with GIF playback using your drawable resource.
+                        Image(
+                            painter = rememberAsyncImagePainter(R.drawable.connecting_gif),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        */
+                    }
                 }
             }
         }
