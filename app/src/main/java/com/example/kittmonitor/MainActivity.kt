@@ -40,6 +40,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.io.File
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
@@ -92,12 +93,14 @@ class MainActivity : ComponentActivity() {
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 if (isConnectedState.value) {
-                                    Icon(
-                                        imageVector = Icons.Default.Save,
-                                        contentDescription = "Save logs",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    IconButton(onClick = { saveLogsToFile() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Save,
+                                            contentDescription = "Save logs",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                             Box(
@@ -165,20 +168,26 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hasPermission(): Boolean {
-        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        val basePerms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
         else arrayOf(
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.ACCESS_FINE_LOCATION
         )
+
+        val storagePerms = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        else emptyArray()
+
+        val perms = basePerms + storagePerms
         return perms.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun requestPermissionsIfNeeded() {
-        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        val basePerms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
         else arrayOf(
             Manifest.permission.BLUETOOTH,
@@ -186,6 +195,11 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_FINE_LOCATION
         )
 
+        val storagePerms = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        else emptyArray()
+
+        val perms = basePerms + storagePerms
         val missing = perms.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
@@ -286,6 +300,20 @@ class MainActivity : ComponentActivity() {
             isWritingDescriptor = true
             val (gatt, descriptor) = item
             gatt.writeDescriptor(descriptor)
+        }
+    }
+
+    private fun saveLogsToFile() {
+        val text = logMessages.joinToString("\n") { it.text }
+        val dir = getExternalFilesDir(null)
+        dir?.let {
+            val file = File(it, "kitt_log_${System.currentTimeMillis()}.txt")
+            try {
+                file.writeText(text)
+                Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
+            } catch (e: Exception) {
+                Log.e("KITTMonitor", "Failed to save logs", e)
+            }
         }
     }
 
@@ -419,3 +447,4 @@ fun TerminalView(
         }
     }
 }
+
