@@ -19,6 +19,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -195,8 +196,9 @@ class MainActivity : ComponentActivity() {
         if (!dir.exists()) dir.mkdirs()
         val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "*/*")
+            setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri)
         }
         startActivity(Intent.createChooser(intent, "Open folder"))
     }
