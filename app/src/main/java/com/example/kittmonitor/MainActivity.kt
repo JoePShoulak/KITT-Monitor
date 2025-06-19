@@ -191,20 +191,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openLogsFolder() {
-        // Open the generic Documents directory rather than the KITT Logs
+        // Open the "KITT Logs" folder in the public Documents directory using our FileProvider
         val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        if (!docsDir.exists()) docsDir.mkdirs()
+        val dir = File(docsDir, "KITT Logs")
+        if (!dir.exists()) dir.mkdirs()
 
-        val docId = "primary:Documents"
-        val uri: Uri = DocumentsContract.buildDocumentUri(
-            "com.android.externalstorage.documents",
-            docId
-        )
-
+        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         }
         startActivity(intent)
     }
