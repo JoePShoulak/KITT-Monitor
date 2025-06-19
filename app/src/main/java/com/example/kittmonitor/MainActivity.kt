@@ -17,17 +17,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresPermission
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.time.LocalDateTime
@@ -38,8 +30,6 @@ import android.app.AlertDialog
 import androidx.core.content.FileProvider
 import android.net.Uri
 import androidx.annotation.RequiresApi
-import kotlinx.coroutines.launch
-import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 
 import com.example.kittmonitor.DescriptorWriteQueue
 
@@ -66,83 +56,16 @@ class MainActivity : ComponentActivity() {
         requestPermissionsIfNeeded()
 
         setContent {
-            KITTMonitorTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black)
-                            .padding(padding)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .background(Color.DarkGray)
-                                .padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                if (isConnectedState.value) {
-                                    IconButton(onClick = { saveLogsToFile() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Save,
-                                            contentDescription = "Save logs",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-                            }
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = statusTextState.value,
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.CenterEnd
-                            ) {
-                                if (isConnectedState.value) {
-                                    Switch(
-                                        checked = followBottomState.value,
-                                        onCheckedChange = { followBottomState.value = it }
-                                    )
-                                }
-                            }
-                        }
-                        if (isConnectedState.value) {
-                            TerminalView(
-                                logs = logMessages,
-                                followBottom = followBottomState.value,
-                                onFollowBottomChange = { followBottomState.value = it },
-                                modifier = Modifier.weight(1f)
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-
-                LaunchedEffect(Unit) {
-                    if (!hasPermission()) return@LaunchedEffect
-
-                    if (!bluetoothAdapter.isEnabled) {
-                        val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                        startActivityForResult(enableBtIntent, 1)
-                    } else {
-                        beginConnectionFlow()
-                    }
-                }
-            }
+            MainScreen(
+                isConnectedState = isConnectedState,
+                statusTextState = statusTextState,
+                logMessages = logMessages,
+                followBottomState = followBottomState,
+                bluetoothAdapter = bluetoothAdapter,
+                saveLogsToFile = ::saveLogsToFile,
+                hasPermission = ::hasPermission,
+                beginConnectionFlow = ::beginConnectionFlow
+            )
         }
     }
 
