@@ -194,13 +194,17 @@ class MainActivity : ComponentActivity() {
         val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
         val dir = File(docsDir, "KITT Logs")
         if (!dir.exists()) dir.mkdirs()
-        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
+
+        // Build a document URI so the system file app can open the folder directly
+        val docId = "primary:Documents/${dir.name}"
+        val uri: Uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", docId)
+
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri)
         }
-        startActivity(Intent.createChooser(intent, "Open folder"))
+        startActivity(intent)
     }
 
     private fun showFileDialog(file: File, displayPath: String) {
