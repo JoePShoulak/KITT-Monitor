@@ -43,6 +43,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.io.File
 import android.widget.Toast
+import android.app.AlertDialog
+import androidx.core.content.FileProvider
+import android.net.Uri
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
@@ -313,14 +316,32 @@ class MainActivity : ComponentActivity() {
             val file = File(it, "log_${'$'}timestamp.txt")
             try {
                 file.writeText(text)
-                Toast.makeText(this, "Saved to ${'$'}{file.absolutePath}", Toast.LENGTH_LONG).show()
-                Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
                 logMessages.clear()
+                Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
+                showFileDialog(file)
             } catch (e: Exception) {
                 Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
                 Log.e("KITTMonitor", "Failed to save logs", e)
             }
         }
+    }
+
+    private fun showFileDialog(file: File) {
+        AlertDialog.Builder(this)
+            .setTitle("Logs saved")
+            .setMessage(file.absolutePath)
+            .setNegativeButton("Close", null)
+            .setPositiveButton("View File") { _, _ -> openFile(file) }
+            .show()
+    }
+
+    private fun openFile(file: File) {
+        val uri: Uri = FileProvider.getUriForFile(this, "${'$'}packageName.provider", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "text/plain")
+            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        }
+        startActivity(Intent.createChooser(intent, "Open file"))
     }
 
     private fun formatMessage(uuid: UUID, value: String): AnnotatedString {
