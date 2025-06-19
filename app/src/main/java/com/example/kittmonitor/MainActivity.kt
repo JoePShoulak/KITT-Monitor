@@ -27,13 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import java.time.LocalTime
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.io.File
@@ -44,7 +40,6 @@ import android.net.Uri
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.launch
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
-import java.util.UUID
 
 import com.example.kittmonitor.DescriptorWriteQueue
 
@@ -229,7 +224,18 @@ class MainActivity : ComponentActivity() {
                     gatt = result.device.connectGatt(
                         currentContext,
                         false,
-                        createGattCallback(onStatusChange, onDisconnected)
+                        createGattCallback(
+                            hasPermission = ::hasPermission,
+                            descriptorQueue = descriptorQueue,
+                            logMessages = logMessages,
+                            isConnectedState = isConnectedState,
+                            statusTextState = statusTextState,
+                            attemptReconnect = {
+                                attemptFullConnection(onStatusChange, onDisconnected)
+                            },
+                            onStatusChange = onStatusChange,
+                            onDisconnected = onDisconnected
+                        )
                     )
                 }
             }
@@ -237,53 +243,6 @@ class MainActivity : ComponentActivity() {
         scanner?.startScan(scanCallback)
     }
 
-    private fun createGattCallback(
-        onStatusChange: (String) -> Unit,
-        onDisconnected: () -> Unit
-    ): BluetoothGattCallback {
-        return object : BluetoothGattCallback() {
-            override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-                Log.d("KITTMonitor", "onConnectionStateChange: status=$status, newState=$newState")
-                if (newState == BluetoothProfile.STATE_CONNECTED && hasPermission()) {
-                    g.discoverServices()
-                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    runOnUiThread {
-                        onDisconnected()
-                        isConnectedState.value = false
-                        attemptFullConnection(onStatusChange, onDisconnected)
-                    }
-                }
-            }
-
-            override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                handleServiceDiscovery(gatt, status, onStatusChange)
-            }
-
-            override fun onCharacteristicChanged(
-                gatt: BluetoothGatt,
-                characteristic: BluetoothGattCharacteristic
-            ) {
-                val value = characteristic.value
-                val raw = value?.decodeToString() ?: ""
-                Log.d(
-                    "KITTMonitor",
-                    "Received update: $raw"
-                )
-                val formatted = formatMessage(characteristic.uuid, raw)
-                runOnUiThread {
-                    logMessages.add(formatted)
-                }
-            }
-
-            override fun onDescriptorWrite(
-                gatt: BluetoothGatt,
-                descriptor: BluetoothGattDescriptor,
-                status: Int
-            ) {
-                descriptorQueue.onWriteComplete()
-            }
-        }
-    }
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun saveLogsToFile() {
@@ -322,70 +281,6 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(intent, "Open file"))
     }
 
-    private fun formatMessage(uuid: UUID, value: String): AnnotatedString {
-        val timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-        val white = Color.White
-        return buildAnnotatedString {
-            withStyle(SpanStyle(color = white)) { append("[$timestamp] ") }
-            when {
-                uuid.toString().uppercase().endsWith("DA70") -> {
-                    withStyle(SpanStyle(color = Color.Cyan)) { append("DAT ") }
-                    withStyle(SpanStyle(color = white)) { append("Voltage: $value") }
-                    withStyle(SpanStyle(color = white)) { append("V") }
-                }
-                uuid.toString().uppercase().endsWith("CBAD") -> {
-                    withStyle(SpanStyle(color = Color.Yellow)) { append("ERR ") }
-                    withStyle(SpanStyle(color = white)) { append(value) }
-                }
-                else -> {
-                    withStyle(SpanStyle(color = white)) { append(value) }
-                }
-            }
-        }
-    }
-
-    private fun handleServiceDiscovery(
-        gatt: BluetoothGatt,
-        status: Int,
-        onStatusChange: (String) -> Unit
-    ) {
-        Log.d("KITTMonitor", "onServicesDiscovered: status=$status")
-        if (status == BluetoothGatt.GATT_SUCCESS && hasPermission()) {
-            runOnUiThread { onStatusChange("Subscribing...") }
-            val targetServiceUUID = UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5EFEED")
-            val targetCharUUIDs = setOf(
-                UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5ECBAD"), // Errors
-                UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5EDA70")  // Voltage
-            )
-
-            val service = gatt.getService(targetServiceUUID)
-            if (service != null) {
-                targetCharUUIDs.forEach { uuid ->
-                    val characteristic = service.getCharacteristic(uuid)
-                    if (characteristic != null &&
-                        characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
-                    ) {
-                        gatt.setCharacteristicNotification(characteristic, true)
-                        val descriptor = characteristic.getDescriptor(
-                            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
-                        )
-                        descriptor?.let {
-                            it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                            descriptorQueue.enqueue(gatt, it)
-                        }
-                    }
-                }
-                statusTextState.value = "KITT Monitor"
-                isConnectedState.value = true
-            } else {
-                Log.w("KITTMonitor", "Target service not found, restarting...")
-                gatt.disconnect()
-            }
-        } else {
-            Log.e("KITTMonitor", "Service discovery failed with status $status")
-            gatt.disconnect()
-        }
-    }
 
     @Deprecated("Deprecated in Java")
     @SuppressLint("MissingPermission")
