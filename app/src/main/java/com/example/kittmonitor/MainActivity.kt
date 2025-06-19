@@ -172,25 +172,26 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun saveLogsToFile() {
         val text = logMessages.joinToString("\n") { it.text }
-        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val dir = File(docsDir, "KITT Logs")
         if (!dir.exists()) dir.mkdirs()
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
-        val file = File(dir, "log_${timestamp}.txt")
+        val file = File(dir, "log_${'$'}timestamp.txt")
         try {
             file.writeText(text)
             logMessages.clear()
-            Log.d("KITTMonitor", "Logs saved to ${file.absolutePath}")
-            showFileDialog(file)
+            Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
+            showFileDialog(file, "/Documents/${'$'}{dir.name}/${'$'}{file.name}")
         } catch (e: Exception) {
             Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
             Log.e("KITTMonitor", "Failed to save logs", e)
         }
     }
 
-    private fun showFileDialog(file: File) {
+    private fun showFileDialog(file: File, displayPath: String) {
         AlertDialog.Builder(this)
             .setTitle("Logs saved")
-            .setMessage(file.absolutePath)
+            .setMessage(displayPath)
             .setNegativeButton("Close", null)
             .setPositiveButton("View File") { _, _ -> openFile(file) }
             .show()
