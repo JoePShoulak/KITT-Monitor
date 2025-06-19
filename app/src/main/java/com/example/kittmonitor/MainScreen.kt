@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 
 @Composable
@@ -112,13 +113,11 @@ fun MainScreen(
                             .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        /* TODO: Replace with GIF playback using your drawable resource.
                         Image(
-                            painter = rememberAsyncImagePainter(R.drawable.connecting_gif),
+                            painter = rememberAsyncImagePainter(R.drawable.kitt),
                             contentDescription = null,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        */
                     }
                 }
             }
