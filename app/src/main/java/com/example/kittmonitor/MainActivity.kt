@@ -18,15 +18,28 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -37,6 +50,9 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
     private val statusTextState = mutableStateOf("")
+    private val isConnectedState = mutableStateOf(false)
+    private val logMessages = mutableStateListOf<AnnotatedString>()
+    private val followBottomState = mutableStateOf(true)
 
     private val descriptorQueue =
         ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
@@ -61,20 +77,41 @@ class MainActivity : ComponentActivity() {
                             .background(Color.Black)
                             .padding(padding)
                     ) {
-                        Box(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
-                                .background(Color.DarkGray),
-                            contentAlignment = Alignment.Center
+                                .background(Color.DarkGray)
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = statusTextState.value,
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = statusTextState.value,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                            if (statusTextState.value == "Completed!" && isConnectedState.value) {
+                                Switch(
+                                    checked = followBottomState.value,
+                                    onCheckedChange = { followBottomState.value = it }
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.weight(1f))
+                        if (isConnectedState.value) {
+                            TerminalView(
+                                logs = logMessages,
+                                followBottom = followBottomState.value,
+                                onFollowBottomChange = { followBottomState.value = it },
+                                modifier = Modifier.weight(1f)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
 
@@ -94,10 +131,15 @@ class MainActivity : ComponentActivity() {
 
     private fun beginConnectionFlow() {
         statusTextState.value = "Searching..."
+        isConnectedState.value = false
+        followBottomState.value = true
+        logMessages.clear()
         attemptFullConnection(
             onStatusChange = { statusTextState.value = it },
             onDisconnected = {
                 statusTextState.value = "Disconnected"
+                isConnectedState.value = false
+                followBottomState.value = true
             }
         )
     }
@@ -174,6 +216,7 @@ class MainActivity : ComponentActivity() {
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     runOnUiThread {
                         onDisconnected()
+                        isConnectedState.value = false
                         attemptFullConnection(onStatusChange, onDisconnected)
                     }
                 }
@@ -188,10 +231,15 @@ class MainActivity : ComponentActivity() {
                 characteristic: BluetoothGattCharacteristic
             ) {
                 val value = characteristic.value
+                val raw = value?.decodeToString() ?: ""
                 Log.d(
                     "KITTMonitor",
-                    "Received update: ${value?.decodeToString()}"
+                    "Received update: $raw"
                 )
+                val formatted = formatMessage(characteristic.uuid, raw)
+                runOnUiThread {
+                    logMessages.add(formatted)
+                }
             }
 
             override fun onDescriptorWrite(
@@ -218,6 +266,28 @@ class MainActivity : ComponentActivity() {
             isWritingDescriptor = true
             val (gatt, descriptor) = item
             gatt.writeDescriptor(descriptor)
+        }
+    }
+
+    private fun formatMessage(uuid: UUID, value: String): AnnotatedString {
+        val timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+        val white = Color.White
+        return buildAnnotatedString {
+            withStyle(SpanStyle(color = white)) { append("[$timestamp] ") }
+            when {
+                uuid.toString().uppercase().endsWith("DA70") -> {
+                    withStyle(SpanStyle(color = Color.Blue)) { append("DAT ") }
+                    withStyle(SpanStyle(color = white)) { append("Voltage: $value") }
+                    withStyle(SpanStyle(color = white)) { append("V") }
+                }
+                uuid.toString().uppercase().endsWith("CBAD") -> {
+                    withStyle(SpanStyle(color = Color.Red)) { append("ERR ") }
+                    withStyle(SpanStyle(color = white)) { append(value) }
+                }
+                else -> {
+                    withStyle(SpanStyle(color = white)) { append(value) }
+                }
+            }
         }
     }
 
@@ -253,6 +323,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 statusTextState.value = "Completed!"
+                isConnectedState.value = true
             } else {
                 Log.w("KITTMonitor", "Target service not found, restarting...")
                 gatt.disconnect()
@@ -269,6 +340,62 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             beginConnectionFlow()
+        }
+    }
+}
+
+@Composable
+fun TerminalView(
+    logs: List<AnnotatedString>,
+    followBottom: Boolean,
+    onFollowBottomChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    var programmaticScroll by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(logs.size, followBottom) {
+        if (followBottom && logs.isNotEmpty()) {
+            programmaticScroll = true
+            listState.animateScrollToItem(logs.size - 1)
+            programmaticScroll = false
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { inProgress ->
+                if (inProgress && !programmaticScroll) {
+                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    if (lastVisible < logs.size - 1) {
+                        onFollowBottomChange(false)
+                    }
+                }
+            }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = {
+                    onFollowBottomChange(true)
+                    programmaticScroll = true
+                    scope.launch {
+                        listState.animateScrollToItem(logs.size - 1)
+                        programmaticScroll = false
+                    }
+                })
+            }
+    ) {
+        items(logs) { message ->
+            Text(
+                text = message,
+                color = Color.Unspecified,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }
