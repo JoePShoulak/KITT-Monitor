@@ -14,6 +14,8 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -48,6 +50,18 @@ class MainActivity : ComponentActivity() {
     private val followBottomState = mutableStateOf(true)
 
     private val descriptorQueue = DescriptorWriteQueue()
+
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                if (state == BluetoothAdapter.STATE_OFF) {
+                    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    startActivityForResult(enableBtIntent, 1)
+                }
+            }
+        }
+    }
 
     @RequiresApi(Build.VERSION_CODES.O)
     @SuppressLint("MissingPermission")
@@ -219,12 +233,26 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(intent, "Open file"))
     }
 
+    override fun onResume() {
+        super.onResume()
+        registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(bluetoothStateReceiver)
+    }
+
     @Deprecated("Deprecated in Java")
     @SuppressLint("MissingPermission")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
-            beginConnectionFlow()
+        if (requestCode == 1) {
+            if (resultCode == Activity.RESULT_OK) {
+                beginConnectionFlow()
+            } else {
+                finish()
+            }
         }
     }
 }
