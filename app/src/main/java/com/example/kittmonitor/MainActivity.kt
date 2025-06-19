@@ -29,11 +29,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.snapshotFlow
+import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -45,7 +51,7 @@ class MainActivity : ComponentActivity() {
     private var gatt: BluetoothGatt? = null
     private val statusTextState = mutableStateOf("")
     private val isConnectedState = mutableStateOf(false)
-    private val logMessages = mutableStateListOf<String>()
+    private val logMessages = mutableStateListOf<AnnotatedString>()
 
     private val descriptorQueue =
         ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
@@ -208,13 +214,14 @@ class MainActivity : ComponentActivity() {
                 characteristic: BluetoothGattCharacteristic
             ) {
                 val value = characteristic.value
-                val message = value?.decodeToString() ?: ""
+                val raw = value?.decodeToString() ?: ""
                 Log.d(
                     "KITTMonitor",
-                    "Received update: $message"
+                    "Received update: $raw"
                 )
+                val formatted = formatMessage(characteristic.uuid, raw)
                 runOnUiThread {
-                    logMessages.add(message)
+                    logMessages.add(formatted)
                 }
             }
 
@@ -242,6 +249,28 @@ class MainActivity : ComponentActivity() {
             isWritingDescriptor = true
             val (gatt, descriptor) = item
             gatt.writeDescriptor(descriptor)
+        }
+    }
+
+    private fun formatMessage(uuid: UUID, value: String): AnnotatedString {
+        val timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+        val white = Color.White
+        return buildAnnotatedString {
+            withStyle(SpanStyle(color = white)) { append("[$timestamp] ") }
+            when {
+                uuid.toString().uppercase().endsWith("DA70") -> {
+                    withStyle(SpanStyle(color = Color.Blue)) { append("DAT ") }
+                    withStyle(SpanStyle(color = white)) { append("Voltage: $value") }
+                    withStyle(SpanStyle(color = white)) { append("V") }
+                }
+                uuid.toString().uppercase().endsWith("CBAD") -> {
+                    withStyle(SpanStyle(color = Color.Red)) { append("ERR ") }
+                    withStyle(SpanStyle(color = white)) { append(value) }
+                }
+                else -> {
+                    withStyle(SpanStyle(color = white)) { append(value) }
+                }
+            }
         }
     }
 
@@ -299,7 +328,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun TerminalView(logs: List<String>, modifier: Modifier = Modifier) {
+fun TerminalView(logs: List<AnnotatedString>, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     var followBottom by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
@@ -336,7 +365,7 @@ fun TerminalView(logs: List<String>, modifier: Modifier = Modifier) {
         items(logs) { message ->
             Text(
                 text = message,
-                color = Color.White,
+                color = Color.Unspecified,
                 style = MaterialTheme.typography.bodySmall
             )
         }
