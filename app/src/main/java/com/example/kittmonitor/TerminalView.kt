@@ -53,11 +53,13 @@ fun TerminalView(
             .fillMaxSize()
             .pointerInput(Unit) {
                 detectTapGestures(onDoubleTap = {
-                    onFollowBottomChange(true)
-                    programmaticScroll = true
-                    scope.launch {
-                        listState.animateScrollToItem(logs.size - 1)
-                        programmaticScroll = false
+                    if (logs.isNotEmpty()) {
+                        onFollowBottomChange(true)
+                        programmaticScroll = true
+                        scope.launch {
+                            listState.animateScrollToItem(logs.size - 1)
+                            programmaticScroll = false
+                        }
                     }
                 })
             }
