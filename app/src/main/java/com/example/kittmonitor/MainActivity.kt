@@ -346,7 +346,7 @@ class MainActivity : ComponentActivity() {
             .setMessage(file.absolutePath)
             .setNegativeButton("Close", null)
             .setNeutralButton("Open Location") { _, _ ->
-                file.parentFile?.let { openLocation(it) }
+                openLocation()
             }
             .setPositiveButton("View File") { _, _ -> openFile(file) }
             .show()
@@ -361,10 +361,12 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(intent, "Open file"))
     }
 
-    private fun openLocation(directory: File) {
-        val relativePath = directory.absolutePath.substringAfter("/storage/emulated/0/")
-        val encoded = Uri.encode(relativePath)
-        val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:" + encoded)
+    private fun openLocation() {
+        val encoded = Uri.encode("Android/data/com.example.kittmonitor/files")
+        val uri = Uri.parse(
+            "content://com.android.externalstorage.documents/document/primary:" +
+                encoded
+        )
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -373,8 +375,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openLogsDirectory() {
-        val dir = getExternalFilesDir(null)
-        dir?.let { openLocation(it) }
+        openLocation()
     }
 
     private fun formatMessage(uuid: UUID, value: String): AnnotatedString {
