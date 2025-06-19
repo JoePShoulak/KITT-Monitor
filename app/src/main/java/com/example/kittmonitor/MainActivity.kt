@@ -18,11 +18,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
@@ -30,7 +26,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -48,10 +43,10 @@ import androidx.core.content.FileProvider
 import android.net.Uri
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
+
+import com.example.kittmonitor.DescriptorWriteQueue
 
 class MainActivity : ComponentActivity() {
     private lateinit var bluetoothAdapter: BluetoothAdapter
@@ -63,9 +58,7 @@ class MainActivity : ComponentActivity() {
     private val logMessages = mutableStateListOf<AnnotatedString>()
     private val followBottomState = mutableStateOf(true)
 
-    private val descriptorQueue =
-        ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
-    private var isWritingDescriptor = false
+    private val descriptorQueue = DescriptorWriteQueue()
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -287,25 +280,8 @@ class MainActivity : ComponentActivity() {
                 descriptor: BluetoothGattDescriptor,
                 status: Int
             ) {
-                isWritingDescriptor = false
-                processNextDescriptor()
+                descriptorQueue.onWriteComplete()
             }
-        }
-    }
-
-    private fun enqueueDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor) {
-        descriptorQueue.add(Pair(gatt, descriptor))
-        if (!isWritingDescriptor) {
-            processNextDescriptor()
-        }
-    }
-
-    private fun processNextDescriptor() {
-        val item = descriptorQueue.poll()
-        if (item != null) {
-            isWritingDescriptor = true
-            val (gatt, descriptor) = item
-            gatt.writeDescriptor(descriptor)
         }
     }
 
@@ -395,7 +371,7 @@ class MainActivity : ComponentActivity() {
                         )
                         descriptor?.let {
                             it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                            enqueueDescriptorWrite(gatt, it)
+                            descriptorQueue.enqueue(gatt, it)
                         }
                     }
                 }
@@ -417,62 +393,6 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             beginConnectionFlow()
-        }
-    }
-}
-
-@Composable
-fun TerminalView(
-    logs: List<AnnotatedString>,
-    followBottom: Boolean,
-    onFollowBottomChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val listState = rememberLazyListState()
-    var programmaticScroll by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(logs.size, followBottom) {
-        if (followBottom && logs.isNotEmpty()) {
-            programmaticScroll = true
-            listState.animateScrollToItem(logs.size - 1)
-            programmaticScroll = false
-        }
-    }
-
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .collect { inProgress ->
-                if (inProgress && !programmaticScroll) {
-                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-                    if (lastVisible < logs.size - 1) {
-                        onFollowBottomChange(false)
-                    }
-                }
-            }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = {
-                    onFollowBottomChange(true)
-                    programmaticScroll = true
-                    scope.launch {
-                        listState.animateScrollToItem(logs.size - 1)
-                        programmaticScroll = false
-                    }
-                })
-            }
-    ) {
-        items(logs) { message ->
-            Text(
-                text = message,
-                color = Color.Unspecified,
-                style = MaterialTheme.typography.bodySmall
-            )
         }
     }
 }
