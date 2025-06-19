@@ -46,6 +46,7 @@ import android.widget.Toast
 import android.app.AlertDialog
 import androidx.core.content.FileProvider
 import android.net.Uri
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
@@ -308,16 +309,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun saveLogsToFile() {
         val text = logMessages.joinToString("\n") { it.text }
         val dir = getExternalFilesDir(null)
         dir?.let {
             val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
-            val file = File(it, "log_${'$'}timestamp.txt")
+            val file = File(it, "log_${timestamp}.txt")
             try {
                 file.writeText(text)
                 logMessages.clear()
-                Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
+                Log.d("KITTMonitor", "Logs saved to ${file.absolutePath}")
                 showFileDialog(file)
             } catch (e: Exception) {
                 Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
