@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
     private var gatt: BluetoothGatt? = null
     private val statusTextState = mutableStateOf("")
 
-    private val descriptorQueue = ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
+    private val descriptorQueue =
+        ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
     private var isWritingDescriptor = false
 
     @SuppressLint("MissingPermission")
@@ -193,7 +194,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            override fun onDescriptorWrite(
+                gatt: BluetoothGatt,
+                descriptor: BluetoothGattDescriptor,
+                status: Int
+            ) {
                 isWritingDescriptor = false
                 processNextDescriptor()
             }
@@ -226,8 +231,8 @@ class MainActivity : ComponentActivity() {
             runOnUiThread { onStatusChange("Subscribing...") }
             val targetServiceUUID = UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5EFEED")
             val targetCharUUIDs = setOf(
-                UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5ECBAD"),
-                UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5EDA7A")
+                UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5ECBAD"), // Errors
+                UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5EDA70")  // Voltage
             )
 
             val service = gatt.getService(targetServiceUUID)
