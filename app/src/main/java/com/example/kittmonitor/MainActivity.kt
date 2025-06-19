@@ -358,7 +358,7 @@ class MainActivity : ComponentActivity() {
                     withStyle(SpanStyle(color = white)) { append("V") }
                 }
                 uuid.toString().uppercase().endsWith("CBAD") -> {
-                    withStyle(SpanStyle(color = Color.Red)) { append("ERR ") }
+                    withStyle(SpanStyle(color = Color.Yellow)) { append("ERR ") }
                     withStyle(SpanStyle(color = white)) { append(value) }
                 }
                 else -> {
