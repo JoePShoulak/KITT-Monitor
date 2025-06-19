@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
@@ -53,14 +54,26 @@ class MainActivity : ComponentActivity() {
         setContent {
             KITTMonitorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(Color.Black)
-                            .padding(padding),
-                        contentAlignment = Alignment.Center
+                            .padding(padding)
                     ) {
-                        Text(statusTextState.value, color = Color.White)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .background(Color.DarkGray),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = statusTextState.value,
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
 
@@ -176,7 +189,7 @@ class MainActivity : ComponentActivity() {
                 val value = characteristic.value
                 Log.d(
                     "KITTMonitor",
-                    "Received update from ${characteristic.uuid}: ${value?.decodeToString()}"
+                    "Received update: ${value?.decodeToString()}"
                 )
             }
 
