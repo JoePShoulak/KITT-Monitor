@@ -336,7 +336,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openFile(file: File) {
-        val uri: Uri = FileProvider.getUriForFile(this, "${'$'}packageName.provider", file)
+        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "text/plain")
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
