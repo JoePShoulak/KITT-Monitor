@@ -47,6 +47,7 @@ import android.widget.Toast
 import android.app.AlertDialog
 import androidx.core.content.FileProvider
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
@@ -363,10 +364,10 @@ class MainActivity : ComponentActivity() {
     private fun openLocation(directory: File) {
         val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", directory)
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "resource/folder")
+            setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
-        startActivity(intent)
+        startActivity(Intent.createChooser(intent, "Open folder"))
     }
 
     private fun openLogsDirectory() {
