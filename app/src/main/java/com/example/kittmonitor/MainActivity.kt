@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                 followBottomState = followBottomState,
                 bluetoothAdapter = bluetoothAdapter,
                 saveLogsToFile = ::saveLogsToFile,
+                openLogsFolder = ::openLogsFolder,
                 hasPermission = ::hasPermission,
                 beginConnectionFlow = ::beginConnectionFlow
             )
@@ -186,6 +187,18 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
             Log.e("KITTMonitor", "Failed to save logs", e)
         }
+    }
+
+    private fun openLogsFolder() {
+        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val dir = File(docsDir, "KITT Logs")
+        if (!dir.exists()) dir.mkdirs()
+        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "*/*")
+            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        }
+        startActivity(Intent.createChooser(intent, "Open folder"))
     }
 
     private fun showFileDialog(file: File, displayPath: String) {

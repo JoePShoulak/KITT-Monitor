@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -27,6 +28,7 @@ fun MainScreen(
     followBottomState: MutableState<Boolean>,
     bluetoothAdapter: BluetoothAdapter,
     saveLogsToFile: () -> Unit,
+    openLogsFolder: () -> Unit,
     hasPermission: () -> Boolean,
     beginConnectionFlow: () -> Unit
 ) {
@@ -52,14 +54,24 @@ fun MainScreen(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        if (isConnectedState.value) {
-                            IconButton(onClick = { saveLogsToFile() }) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { openLogsFolder() }) {
                                 Icon(
-                                    imageVector = Icons.Default.Save,
-                                    contentDescription = "Save logs",
+                                    imageVector = Icons.Default.FolderOpen,
+                                    contentDescription = "Open logs folder",
                                     tint = Color.White,
                                     modifier = Modifier.size(20.dp)
                                 )
+                            }
+                            if (isConnectedState.value) {
+                                IconButton(onClick = { saveLogsToFile() }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Save,
+                                        contentDescription = "Save logs",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
