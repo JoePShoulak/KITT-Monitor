@@ -362,7 +362,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openLocation(directory: File) {
-        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", directory)
+        val relativePath = directory.absolutePath.substringAfter("/storage/emulated/0/")
+        val encoded = Uri.encode(relativePath)
+        val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3A$encoded")
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
