@@ -39,8 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.time.LocalTime
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.io.File
+import android.widget.Toast
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
@@ -307,11 +309,15 @@ class MainActivity : ComponentActivity() {
         val text = logMessages.joinToString("\n") { it.text }
         val dir = getExternalFilesDir(null)
         dir?.let {
-            val file = File(it, "kitt_log_${System.currentTimeMillis()}.txt")
+            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
+            val file = File(it, "log_${'$'}timestamp.txt")
             try {
                 file.writeText(text)
+                Toast.makeText(this, "Saved to ${'$'}{file.absolutePath}", Toast.LENGTH_LONG).show()
                 Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
+                logMessages.clear()
             } catch (e: Exception) {
+                Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
                 Log.e("KITTMonitor", "Failed to save logs", e)
             }
         }
