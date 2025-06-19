@@ -174,16 +174,15 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun saveLogsToFile() {
         val text = logMessages.joinToString("\n") { it.text }
-        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val dir = File(docsDir, "KITT Logs")
-        if (!dir.exists()) dir.mkdirs()
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!downloadsDir.exists()) downloadsDir.mkdirs()
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
-        val file = File(dir, "log_${'$'}timestamp.txt")
+        val file = File(downloadsDir, "log_${'$'}timestamp.txt")
         try {
             file.writeText(text)
             logMessages.clear()
             Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
-            showFileDialog(file, "/Documents/${'$'}{dir.name}/${'$'}{file.name}")
+            showFileDialog(file, "/Downloads/${'$'}{file.name}")
         } catch (e: Exception) {
             Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
             Log.e("KITTMonitor", "Failed to save logs", e)
@@ -191,10 +190,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openLogsFolder() {
-        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val dir = File(docsDir, "KITT Logs")
-        if (!dir.exists()) dir.mkdirs()
-        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!downloadsDir.exists()) downloadsDir.mkdirs()
+        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", downloadsDir)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
