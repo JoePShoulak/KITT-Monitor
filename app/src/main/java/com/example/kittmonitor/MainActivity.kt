@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.example.kittmonitor.ui.AutoScrollText
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
     private val statusTextState = mutableStateOf("")
+    private val logMessages = mutableStateListOf<String>()
 
     private val descriptorQueue =
         ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
@@ -74,7 +76,13 @@ class MainActivity : ComponentActivity() {
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }
-                        Spacer(modifier = Modifier.weight(1f))
+                        AutoScrollText(
+                            text = logMessages.joinToString("\n"),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            style = MaterialTheme.typography.bodyMedium.copy(color = Color.White)
+                        )
                     }
                 }
 
@@ -188,10 +196,14 @@ class MainActivity : ComponentActivity() {
                 characteristic: BluetoothGattCharacteristic
             ) {
                 val value = characteristic.value
+                val message = value?.decodeToString() ?: ""
                 Log.d(
                     "KITTMonitor",
-                    "Received update: ${value?.decodeToString()}"
+                    "Received update: $message"
                 )
+                runOnUiThread {
+                    logMessages.add(message)
+                }
             }
 
             override fun onDescriptorWrite(
