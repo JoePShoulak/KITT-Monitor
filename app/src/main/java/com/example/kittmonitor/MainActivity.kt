@@ -18,15 +18,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -37,6 +44,8 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
     private val statusTextState = mutableStateOf("")
+    private val isConnectedState = mutableStateOf(false)
+    private val logMessages = mutableStateListOf<String>()
 
     private val descriptorQueue =
         ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
@@ -74,7 +83,14 @@ class MainActivity : ComponentActivity() {
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }
-                        Spacer(modifier = Modifier.weight(1f))
+                        if (isConnectedState.value) {
+                            TerminalView(
+                                logs = logMessages,
+                                modifier = Modifier.weight(1f)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
 
@@ -94,10 +110,13 @@ class MainActivity : ComponentActivity() {
 
     private fun beginConnectionFlow() {
         statusTextState.value = "Searching..."
+        isConnectedState.value = false
+        logMessages.clear()
         attemptFullConnection(
             onStatusChange = { statusTextState.value = it },
             onDisconnected = {
                 statusTextState.value = "Disconnected"
+                isConnectedState.value = false
             }
         )
     }
@@ -174,6 +193,7 @@ class MainActivity : ComponentActivity() {
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     runOnUiThread {
                         onDisconnected()
+                        isConnectedState.value = false
                         attemptFullConnection(onStatusChange, onDisconnected)
                     }
                 }
@@ -188,10 +208,14 @@ class MainActivity : ComponentActivity() {
                 characteristic: BluetoothGattCharacteristic
             ) {
                 val value = characteristic.value
+                val message = value?.decodeToString() ?: ""
                 Log.d(
                     "KITTMonitor",
-                    "Received update: ${value?.decodeToString()}"
+                    "Received update: $message"
                 )
+                runOnUiThread {
+                    logMessages.add(message)
+                }
             }
 
             override fun onDescriptorWrite(
@@ -253,6 +277,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 statusTextState.value = "Completed!"
+                isConnectedState.value = true
             } else {
                 Log.w("KITTMonitor", "Target service not found, restarting...")
                 gatt.disconnect()
@@ -269,6 +294,51 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             beginConnectionFlow()
+        }
+    }
+}
+
+@Composable
+fun TerminalView(logs: List<String>, modifier: Modifier = Modifier) {
+    val listState = rememberLazyListState()
+    var followBottom by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(logs.size, followBottom) {
+        if (followBottom && logs.isNotEmpty()) {
+            listState.animateScrollToItem(logs.size - 1)
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { inProgress ->
+                if (inProgress) {
+                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    if (lastVisible < logs.size - 1) {
+                        followBottom = false
+                    }
+                }
+            }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = {
+                    followBottom = true
+                    scope.launch { listState.animateScrollToItem(logs.size - 1) }
+                })
+            }
+    ) {
+        items(logs) { message ->
+            Text(
+                text = message,
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }
