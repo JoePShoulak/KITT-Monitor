@@ -15,15 +15,22 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.ImageLoader
+import coil.request.ImageRequest
+import androidx.compose.runtime.remember
+import android.os.Build
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 
 @Composable
 fun MainScreen(
     isConnectedState: MutableState<Boolean>,
-    statusTextState: MutableState<String>,
     logMessages: MutableList<AnnotatedString>,
     followBottomState: MutableState<Boolean>,
     bluetoothAdapter: BluetoothAdapter,
@@ -79,11 +86,13 @@ fun MainScreen(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = statusTextState.value,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (isConnectedState.value) {
+                            Text(
+                                text = "KITT Monitor",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier.weight(1f),
@@ -105,7 +114,35 @@ fun MainScreen(
                         modifier = Modifier.weight(1f)
                     )
                 } else {
-                    Spacer(modifier = Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val context = LocalContext.current
+                        val imageLoader = remember {
+                            ImageLoader.Builder(context)
+                                .allowHardware(false)
+                                .components {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                        add(ImageDecoderDecoder.Factory())
+                                    } else {
+                                        add(GifDecoder.Factory())
+                                    }
+                                }
+                                .build()
+                        }
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(R.drawable.kitt)
+                                .build(),
+                            imageLoader = imageLoader,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxWidth(),
+                            contentScale = ContentScale.FillWidth
+                        )
+                    }
                 }
             }
         }

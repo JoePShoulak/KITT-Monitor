@@ -44,7 +44,6 @@ class MainActivity : ComponentActivity() {
     private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
-    private val statusTextState = mutableStateOf("")
     private val isConnectedState = mutableStateOf(false)
     private val logMessages = mutableStateListOf<AnnotatedString>()
     private val followBottomState = mutableStateOf(true)
@@ -77,7 +76,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             MainScreen(
                 isConnectedState = isConnectedState,
-                statusTextState = statusTextState,
                 logMessages = logMessages,
                 followBottomState = followBottomState,
                 bluetoothAdapter = bluetoothAdapter,
@@ -91,14 +89,11 @@ class MainActivity : ComponentActivity() {
 
     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private fun beginConnectionFlow() {
-        statusTextState.value = "Searching..."
         isConnectedState.value = false
         followBottomState.value = true
         logMessages.clear()
         attemptFullConnection(
-            onStatusChange = { statusTextState.value = it },
             onDisconnected = {
-                statusTextState.value = "Disconnected"
                 isConnectedState.value = false
                 followBottomState.value = true
             }
@@ -146,14 +141,13 @@ class MainActivity : ComponentActivity() {
 
     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
     private fun attemptFullConnection(
-        onStatusChange: (String) -> Unit,
         onDisconnected: () -> Unit
     ) {
-        startScan(onStatusChange, onDisconnected)
+        startScan(onDisconnected)
     }
 
     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
-    private fun startScan(onStatusChange: (String) -> Unit, onDisconnected: () -> Unit) {
+    private fun startScan(onDisconnected: () -> Unit) {
         scanner = bluetoothAdapter.bluetoothLeScanner
         scanCallback = object : ScanCallback() {
             @SuppressLint("MissingPermission")
@@ -161,7 +155,6 @@ class MainActivity : ComponentActivity() {
                 if (!hasPermission()) return
                 if (result.device.name == "KITT") {
                     scanner?.stopScan(this)
-                    onStatusChange("Connecting...")
 
                     val currentContext = this@MainActivity
 
@@ -173,9 +166,7 @@ class MainActivity : ComponentActivity() {
                             descriptorQueue = descriptorQueue,
                             logMessages = logMessages,
                             isConnectedState = isConnectedState,
-                            statusTextState = statusTextState,
-                            attemptReconnect = { attemptFullConnection(onStatusChange, onDisconnected) },
-                            onStatusChange = onStatusChange,
+                            attemptReconnect = { attemptFullConnection(onDisconnected) },
                             onDisconnected = onDisconnected
                         )
                     )
