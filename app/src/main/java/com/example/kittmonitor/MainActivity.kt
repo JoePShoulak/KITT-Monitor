@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import androidx.compose.runtime.snapshotFlow
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
+import android.os.Environment
 
 class MainActivity : ComponentActivity() {
     private lateinit var bluetoothAdapter: BluetoothAdapter
@@ -99,13 +101,24 @@ class MainActivity : ComponentActivity() {
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 if (isConnectedState.value) {
-                                    IconButton(onClick = { saveLogsToFile() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Save,
-                                            contentDescription = "Save logs",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { saveLogsToFile() }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Save,
+                                                contentDescription = "Save logs",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(onClick = { openLogsDirectory() }) {
+                                            Icon(
+                                                imageVector = Icons.Default.FolderOpen,
+                                                contentDescription = "Open logs directory",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -182,9 +195,16 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_FINE_LOCATION
         )
 
-        val storagePerms = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
-            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        else emptyArray()
+        val storagePerms = when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ->
+                arrayOf(
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                )
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ->
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            else -> emptyArray()
+        }
 
         val perms = basePerms + storagePerms
         return perms.all {
@@ -201,9 +221,16 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_FINE_LOCATION
         )
 
-        val storagePerms = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
-            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        else emptyArray()
+        val storagePerms = when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ->
+                arrayOf(
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                )
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ->
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            else -> emptyArray()
+        }
 
         val perms = basePerms + storagePerms
         val missing = perms.filter {
@@ -312,19 +339,19 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun saveLogsToFile() {
         val text = logMessages.joinToString("\n") { it.text }
-        val dir = getExternalFilesDir(null)
-        dir?.let {
-            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
-            val file = File(it, "log_${timestamp}.txt")
-            try {
-                file.writeText(text)
-                logMessages.clear()
-                Log.d("KITTMonitor", "Logs saved to ${file.absolutePath}")
-                showFileDialog(file)
-            } catch (e: Exception) {
-                Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
-                Log.e("KITTMonitor", "Failed to save logs", e)
-            }
+        val baseDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val dir = File(baseDir, "KITT Logs")
+        if (!dir.exists()) dir.mkdirs()
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
+        val file = File(dir, "log_${timestamp}.txt")
+        try {
+            file.writeText(text)
+            logMessages.clear()
+            Log.d("KITTMonitor", "Logs saved to ${file.absolutePath}")
+            showFileDialog(file)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
+            Log.e("KITTMonitor", "Failed to save logs", e)
         }
     }
 
@@ -344,6 +371,22 @@ class MainActivity : ComponentActivity() {
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         startActivity(Intent.createChooser(intent, "Open file"))
+    }
+
+    private fun openLogsDirectory() {
+        val baseDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val dir = File(baseDir, "KITT Logs")
+        if (!dir.exists()) dir.mkdirs()
+        val uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "resource/folder")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(Intent.createChooser(intent, "Open directory"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "No app found to open directory", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun formatMessage(uuid: UUID, value: String): AnnotatedString {
