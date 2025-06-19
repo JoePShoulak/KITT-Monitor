@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +54,7 @@ class MainActivity : ComponentActivity() {
     private val statusTextState = mutableStateOf("")
     private val isConnectedState = mutableStateOf(false)
     private val logMessages = mutableStateListOf<AnnotatedString>()
+    private val followBottomState = mutableStateOf(true)
 
     private val descriptorQueue =
         ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
@@ -76,22 +79,54 @@ class MainActivity : ComponentActivity() {
                             .background(Color.Black)
                             .padding(padding)
                     ) {
-                        Box(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
-                                .background(Color.DarkGray),
-                            contentAlignment = Alignment.Center
+                                .background(Color.DarkGray)
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = statusTextState.value,
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                if (isConnectedState.value) {
+                                    Icon(
+                                        imageVector = Icons.Default.Save,
+                                        contentDescription = "Save logs",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = statusTextState.value,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                if (isConnectedState.value) {
+                                    Switch(
+                                        checked = followBottomState.value,
+                                        onCheckedChange = { followBottomState.value = it }
+                                    )
+                                }
+                            }
                         }
                         if (isConnectedState.value) {
                             TerminalView(
                                 logs = logMessages,
+                                followBottom = followBottomState.value,
+                                onFollowBottomChange = { followBottomState.value = it },
                                 modifier = Modifier.weight(1f)
                             )
                         } else {
@@ -117,12 +152,14 @@ class MainActivity : ComponentActivity() {
     private fun beginConnectionFlow() {
         statusTextState.value = "Searching..."
         isConnectedState.value = false
+        followBottomState.value = true
         logMessages.clear()
         attemptFullConnection(
             onStatusChange = { statusTextState.value = it },
             onDisconnected = {
                 statusTextState.value = "Disconnected"
                 isConnectedState.value = false
+                followBottomState.value = true
             }
         )
     }
@@ -305,7 +342,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                statusTextState.value = "Completed!"
+                statusTextState.value = "KITT Monitor"
                 isConnectedState.value = true
             } else {
                 Log.w("KITTMonitor", "Target service not found, restarting...")
@@ -328,24 +365,31 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun TerminalView(logs: List<AnnotatedString>, modifier: Modifier = Modifier) {
+fun TerminalView(
+    logs: List<AnnotatedString>,
+    followBottom: Boolean,
+    onFollowBottomChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val listState = rememberLazyListState()
-    var followBottom by remember { mutableStateOf(true) }
+    var programmaticScroll by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(logs.size, followBottom) {
         if (followBottom && logs.isNotEmpty()) {
+            programmaticScroll = true
             listState.animateScrollToItem(logs.size - 1)
+            programmaticScroll = false
         }
     }
 
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .collect { inProgress ->
-                if (inProgress) {
+                if (inProgress && !programmaticScroll) {
                     val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
                     if (lastVisible < logs.size - 1) {
-                        followBottom = false
+                        onFollowBottomChange(false)
                     }
                 }
             }
@@ -357,8 +401,12 @@ fun TerminalView(logs: List<AnnotatedString>, modifier: Modifier = Modifier) {
             .fillMaxSize()
             .pointerInput(Unit) {
                 detectTapGestures(onDoubleTap = {
-                    followBottom = true
-                    scope.launch { listState.animateScrollToItem(logs.size - 1) }
+                    onFollowBottomChange(true)
+                    programmaticScroll = true
+                    scope.launch {
+                        listState.animateScrollToItem(logs.size - 1)
+                        programmaticScroll = false
+                    }
                 })
             }
     ) {
