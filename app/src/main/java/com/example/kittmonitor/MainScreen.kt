@@ -20,6 +20,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.ImageLoader
+import coil.request.ImageRequest
+import androidx.compose.runtime.remember
+import android.os.Build
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
 
 @Composable
@@ -114,8 +120,24 @@ fun MainScreen(
                             .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
+                        val context = LocalContext.current
+                        val imageLoader = remember {
+                            ImageLoader.Builder(context)
+                                .allowHardware(false)
+                                .components {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                        add(ImageDecoderDecoder.Factory())
+                                    } else {
+                                        add(GifDecoder.Factory())
+                                    }
+                                }
+                                .build()
+                        }
                         AsyncImage(
-                            model = R.drawable.kitt,
+                            model = ImageRequest.Builder(context)
+                                .data(R.drawable.kitt)
+                                .build(),
+                            imageLoader = imageLoader,
                             contentDescription = null,
                             modifier = Modifier.fillMaxWidth(),
                             contentScale = ContentScale.FillWidth
