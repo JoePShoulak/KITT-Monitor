@@ -35,6 +35,8 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
 
+    private val statusTextState = mutableStateOf("")
+
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,9 +48,6 @@ class MainActivity : ComponentActivity() {
         requestPermissionsIfNeeded()
 
         setContent {
-            var statusText by remember { mutableStateOf("") }
-            LocalContext.current
-
             KITTMonitorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
                     Box(
@@ -58,7 +57,7 @@ class MainActivity : ComponentActivity() {
                             .padding(padding),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(statusText, color = Color.White)
+                        Text(statusTextState.value, color = Color.White)
                     }
                 }
 
@@ -69,11 +68,11 @@ class MainActivity : ComponentActivity() {
                         val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                         startActivityForResult(enableBtIntent, 1)
                     } else {
-                        statusText = "Searching..."
+                        statusTextState.value = "Searching..."
                         attemptFullConnection(
-                            onStatusChange = { statusText = it },
+                            onStatusChange = { statusTextState.value = it },
                             onDisconnected = {
-                                statusText = "Disconnected"
+                                statusTextState.value = "Disconnected"
                             }
                         )
                     }
@@ -189,7 +188,7 @@ class MainActivity : ComponentActivity() {
             finish() // Exit app if user refuses to enable Bluetooth
         } else {
             setContent {
-                var statusText by remember { mutableStateOf("Searching...") }
+                statusTextState.value = "Searching..."
                 KITTMonitorTheme {
                     Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
                         Box(
@@ -199,14 +198,14 @@ class MainActivity : ComponentActivity() {
                                 .padding(padding),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(statusText, color = Color.White)
+                            Text(statusTextState.value, color = Color.White)
                         }
                     }
 
                     attemptFullConnection(
-                        onStatusChange = { statusText = it },
+                        onStatusChange = { statusTextState.value = it },
                         onDisconnected = {
-                            statusText = "Disconnected"
+                            statusTextState.value = "Disconnected"
                         }
                     )
                 }
