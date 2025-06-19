@@ -191,17 +191,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openLogsFolder() {
-        // Open the "KITT Logs" folder in the public Documents directory using our FileProvider
-        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val dir = File(docsDir, "KITT Logs")
-        if (!dir.exists()) dir.mkdirs()
+        // Build a document URI pointing at /Documents/KITT Logs so the system file app opens there
+        val documentId = "primary:Documents/KITT Logs"
+        val uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", documentId)
 
-        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        startActivity(intent)
+
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "No app found to open folder", Toast.LENGTH_LONG).show()
+            Log.e("KITTMonitor", "Failed to open folder", e)
+        }
     }
 
     private fun showFileDialog(file: File, displayPath: String) {
