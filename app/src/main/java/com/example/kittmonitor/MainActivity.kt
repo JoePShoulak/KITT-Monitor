@@ -351,7 +351,7 @@ class MainActivity : ComponentActivity() {
             withStyle(SpanStyle(color = white)) { append("[$timestamp] ") }
             when {
                 uuid.toString().uppercase().endsWith("DA70") -> {
-                    withStyle(SpanStyle(color = Color.Blue)) { append("DAT ") }
+                    withStyle(SpanStyle(color = Color.Cyan)) { append("DAT ") }
                     withStyle(SpanStyle(color = white)) { append("Voltage: $value") }
                     withStyle(SpanStyle(color = white)) { append("V") }
                 }
