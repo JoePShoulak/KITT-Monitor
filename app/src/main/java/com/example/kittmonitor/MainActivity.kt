@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.kittmonitor
 
 import android.Manifest
@@ -45,7 +47,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var statusText by remember { mutableStateOf("") }
-            val context = LocalContext.current
+            LocalContext.current
 
             KITTMonitorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
@@ -68,7 +70,7 @@ class MainActivity : ComponentActivity() {
                         startActivityForResult(enableBtIntent, 1)
                     } else {
                         statusText = "Searching..."
-                        startScan(
+                        attemptFullConnection(
                             onStatusChange = { statusText = it },
                             onDisconnected = {
                                 statusText = "Disconnected"
@@ -89,10 +91,7 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.ACCESS_FINE_LOCATION
         )
         return perms.all {
-            ContextCompat.checkSelfPermission(
-                this,
-                it
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
@@ -106,12 +105,14 @@ class MainActivity : ComponentActivity() {
         )
 
         val missing = perms.filter {
-            ContextCompat.checkSelfPermission(
-                this,
-                it
-            ) != PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1)
+    }
+
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
+    private fun attemptFullConnection(onStatusChange: (String) -> Unit, onDisconnected: () -> Unit) {
+        startScan(onStatusChange, onDisconnected)
     }
 
     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
@@ -126,6 +127,7 @@ class MainActivity : ComponentActivity() {
                     onStatusChange("Connecting...")
 
                     val currentContext = this@MainActivity
+
                     gatt = result.device.connectGatt(
                         currentContext,
                         false,
@@ -142,29 +144,34 @@ class MainActivity : ComponentActivity() {
                                 if (newState == BluetoothProfile.STATE_CONNECTED && hasPermission()) {
                                     g.discoverServices()
                                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                                    runOnUiThread { onDisconnected() }
+                                    runOnUiThread {
+                                        onDisconnected()
+                                        attemptFullConnection(onStatusChange, onDisconnected)
+                                    }
                                 }
                             }
 
                             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                                 Log.d("KITTMonitor", "onServicesDiscovered: status=$status")
                                 if (status == BluetoothGatt.GATT_SUCCESS && hasPermission()) {
+                                    var found = false
                                     gatt.services.forEach { service ->
+                                        found = true
                                         Log.d("KITTMonitor", "Service: ${service.uuid}")
                                         service.characteristics.forEach { characteristic ->
-                                            Log.d(
-                                                "KITTMonitor",
-                                                "Characteristic: ${characteristic.uuid}"
-                                            )
+                                            Log.d("KITTMonitor", "Characteristic: ${characteristic.uuid}")
                                         }
                                     }
 
-                                    runOnUiThread { onStatusChange("Subscribing...") }
+                                    if (!found) {
+                                        Log.w("KITTMonitor", "discovery timeout, restarting scan...")
+                                        gatt.disconnect()
+                                    } else {
+                                        runOnUiThread { onStatusChange("Subscribing...") }
+                                    }
                                 } else {
-                                    Log.e(
-                                        "KITTMonitor",
-                                        "Service discovery failed with status $status"
-                                    )
+                                    Log.e("KITTMonitor", "Service discovery failed with status $status")
+                                    gatt.disconnect()
                                 }
                             }
                         })
@@ -174,12 +181,13 @@ class MainActivity : ComponentActivity() {
         scanner?.startScan(scanCallback)
     }
 
+    @Deprecated("Deprecated in Java")
+    @SuppressLint("MissingPermission")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1 && resultCode != Activity.RESULT_OK) {
             finish() // Exit app if user refuses to enable Bluetooth
         } else {
-            val context = this
             setContent {
                 var statusText by remember { mutableStateOf("Searching...") }
                 KITTMonitorTheme {
@@ -195,7 +203,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    startScan(
+                    attemptFullConnection(
                         onStatusChange = { statusText = it },
                         onDisconnected = {
                             statusText = "Disconnected"
