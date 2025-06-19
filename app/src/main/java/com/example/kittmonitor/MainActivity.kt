@@ -178,12 +178,12 @@ class MainActivity : ComponentActivity() {
         val dir = File(docsDir, "KITT Logs")
         if (!dir.exists()) dir.mkdirs()
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMddHHmmss"))
-        val file = File(dir, "log_${'$'}timestamp.txt")
+        val file = File(dir, "log_${timestamp}.txt")
         try {
             file.writeText(text)
             logMessages.clear()
-            Log.d("KITTMonitor", "Logs saved to ${'$'}{file.absolutePath}")
-            showFileDialog(file, "/Documents/${'$'}{dir.name}/${'$'}{file.name}")
+            Log.d("KITTMonitor", "Logs saved to ${file.absolutePath}")
+            showFileDialog(file, "/Documents/${dir.name}/${file.name}")
         } catch (e: Exception) {
             Toast.makeText(this, "Failed to save logs", Toast.LENGTH_LONG).show()
             Log.e("KITTMonitor", "Failed to save logs", e)
@@ -191,9 +191,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openLogsFolder() {
-        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val dir = File(docsDir, "KITT Logs")
-        if (!dir.exists()) dir.mkdirs()
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
         val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, DocumentsContract.Document.MIME_TYPE_DIR)
