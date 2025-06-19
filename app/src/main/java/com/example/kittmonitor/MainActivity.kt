@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,13 +100,23 @@ class MainActivity : ComponentActivity() {
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 if (isConnectedState.value) {
-                                    IconButton(onClick = { saveLogsToFile() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Save,
-                                            contentDescription = "Save logs",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                    Row {
+                                        IconButton(onClick = { saveLogsToFile() }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Save,
+                                                contentDescription = "Save logs",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        IconButton(onClick = { openLogsDirectory() }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Folder,
+                                                contentDescription = "Open logs directory",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -333,6 +344,9 @@ class MainActivity : ComponentActivity() {
             .setTitle("Logs saved")
             .setMessage(file.absolutePath)
             .setNegativeButton("Close", null)
+            .setNeutralButton("Open Location") { _, _ ->
+                file.parentFile?.let { openLocation(it) }
+            }
             .setPositiveButton("View File") { _, _ -> openFile(file) }
             .show()
     }
@@ -344,6 +358,20 @@ class MainActivity : ComponentActivity() {
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         startActivity(Intent.createChooser(intent, "Open file"))
+    }
+
+    private fun openLocation(directory: File) {
+        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", directory)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "resource/folder")
+            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        }
+        startActivity(intent)
+    }
+
+    private fun openLogsDirectory() {
+        val dir = getExternalFilesDir(null)
+        dir?.let { openLocation(it) }
     }
 
     private fun formatMessage(uuid: UUID, value: String): AnnotatedString {
