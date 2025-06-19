@@ -13,6 +13,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +38,8 @@ class MainActivity : ComponentActivity() {
     private var scanCallback: ScanCallback? = null
     private var gatt: BluetoothGatt? = null
     private val statusTextState = mutableStateOf("")
+
+    private val logLines = mutableListOf<String>()
 
     private val descriptorQueue =
         ConcurrentLinkedQueue<Pair<BluetoothGatt, BluetoothGattDescriptor>>()
@@ -75,6 +78,14 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { saveLogToFile() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Text("Save")
+                        }
                     }
                 }
 
@@ -103,26 +114,36 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hasPermission(): Boolean {
-        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        val base = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
         else arrayOf(
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.ACCESS_FINE_LOCATION
         )
+        val storage = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        else emptyArray()
+
+        val perms = base + storage
         return perms.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun requestPermissionsIfNeeded() {
-        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        val base = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
         else arrayOf(
             Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
             Manifest.permission.ACCESS_FINE_LOCATION
         )
+        val storage = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        else emptyArray()
+
+        val perms = base + storage
 
         val missing = perms.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -188,9 +209,11 @@ class MainActivity : ComponentActivity() {
                 characteristic: BluetoothGattCharacteristic
             ) {
                 val value = characteristic.value
+                val text = value?.decodeToString() ?: ""
+                logLines.add(text)
                 Log.d(
                     "KITTMonitor",
-                    "Received update: ${value?.decodeToString()}"
+                    "Received update: $text"
                 )
             }
 
@@ -269,6 +292,17 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             beginConnectionFlow()
+        }
+    }
+
+    private fun saveLogToFile() {
+        val dir = getExternalFilesDir(null)
+        if (dir != null) {
+            val file = File(dir, "kitt_log.txt")
+            file.writeText(logLines.joinToString("\n"))
+            statusTextState.value = "Saved: ${file.absolutePath}"
+        } else {
+            statusTextState.value = "Save failed"
         }
     }
 }
