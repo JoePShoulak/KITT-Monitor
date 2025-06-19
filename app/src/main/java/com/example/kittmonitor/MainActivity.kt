@@ -227,6 +227,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+        if (hasPermission() && !bluetoothAdapter.isEnabled) {
+            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+            startActivityForResult(enableBtIntent, 1)
+        }
     }
 
     override fun onPause() {
