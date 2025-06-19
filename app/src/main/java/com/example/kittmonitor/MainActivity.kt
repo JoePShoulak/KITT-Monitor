@@ -85,6 +85,7 @@ class MainActivity : ComponentActivity() {
                                 .padding(horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Box(modifier = Modifier.weight(1f))
                             Box(
                                 modifier = Modifier.weight(1f),
                                 contentAlignment = Alignment.Center
@@ -95,11 +96,16 @@ class MainActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                             }
-                            if (statusTextState.value == "Completed!" && isConnectedState.value) {
-                                Switch(
-                                    checked = followBottomState.value,
-                                    onCheckedChange = { followBottomState.value = it }
-                                )
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                if (isConnectedState.value) {
+                                    Switch(
+                                        checked = followBottomState.value,
+                                        onCheckedChange = { followBottomState.value = it }
+                                    )
+                                }
                             }
                         }
                         if (isConnectedState.value) {
@@ -322,7 +328,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                statusTextState.value = "Completed!"
+                statusTextState.value = "KITT Monitor"
                 isConnectedState.value = true
             } else {
                 Log.w("KITTMonitor", "Target service not found, restarting...")
