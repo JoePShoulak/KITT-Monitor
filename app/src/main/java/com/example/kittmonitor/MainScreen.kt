@@ -19,11 +19,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
+import com.example.kittmonitor.KITTScanner
 
 @Composable
 fun MainScreen(
     isConnectedState: MutableState<Boolean>,
-    statusTextState: MutableState<String>,
     logMessages: MutableList<AnnotatedString>,
     followBottomState: MutableState<Boolean>,
     bluetoothAdapter: BluetoothAdapter,
@@ -79,11 +79,19 @@ fun MainScreen(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = statusTextState.value,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (isConnectedState.value) {
+                            Text(
+                                text = "KITT Monitor",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        } else {
+                            KITTScanner(
+                                modifier = Modifier
+                                    .height(20.dp)
+                                    .fillMaxWidth(0.6f)
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier.weight(1f),

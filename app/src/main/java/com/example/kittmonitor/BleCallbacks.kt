@@ -12,15 +12,12 @@ fun createGattCallback(
     descriptorQueue: DescriptorWriteQueue,
     logMessages: MutableList<AnnotatedString>,
     isConnectedState: MutableState<Boolean>,
-    statusTextState: MutableState<String>,
     attemptReconnect: () -> Unit,
-    onStatusChange: (String) -> Unit,
     onDisconnected: () -> Unit
 ): BluetoothGattCallback {
     fun handleServiceDiscovery(gatt: BluetoothGatt, status: Int) {
         Log.d("KITTMonitor", "onServicesDiscovered: status=$status")
         if (status == BluetoothGatt.GATT_SUCCESS && hasPermission()) {
-            onStatusChange("Subscribing...")
             val targetServiceUUID = UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5EFEED")
             val targetCharUUIDs = setOf(
                 UUID.fromString("1982C0DE-D00D-1123-BEEF-C0DEBA5ECBAD"),
@@ -44,7 +41,6 @@ fun createGattCallback(
                         }
                     }
                 }
-                statusTextState.value = "KITT Monitor"
                 isConnectedState.value = true
             } else {
                 Log.w("KITTMonitor", "Target service not found, restarting...")
