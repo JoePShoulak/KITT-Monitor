@@ -16,23 +16,33 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
 import com.example.kittmonitor.ui.theme.KITTMonitorTheme
+import com.example.kittmonitor.VoltageGraph
 
 @Composable
 fun MainScreen(
     isConnectedState: MutableState<Boolean>,
     statusTextState: MutableState<String>,
     logMessages: MutableList<AnnotatedString>,
+    voltageData: MutableList<Pair<Long, Float>>,
     followBottomState: MutableState<Boolean>,
     bluetoothAdapter: BluetoothAdapter,
     saveLogsToFile: () -> Unit,
     openLogsFolder: () -> Unit,
     hasPermission: () -> Boolean,
-    beginConnectionFlow: () -> Unit
+    beginConnectionFlow: () -> Unit,
+    setOrientationAllowed: (Boolean) -> Unit
 ) {
     val activity = LocalContext.current as Activity
+    val configuration = LocalConfiguration.current
+
+    LaunchedEffect(isConnectedState.value) {
+        setOrientationAllowed(isConnectedState.value)
+    }
 
     KITTMonitorTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
@@ -98,12 +108,19 @@ fun MainScreen(
                     }
                 }
                 if (isConnectedState.value) {
-                    TerminalView(
-                        logs = logMessages,
-                        followBottom = followBottomState.value,
-                        onFollowBottomChange = { followBottomState.value = it },
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                        VoltageGraph(
+                            data = voltageData,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        TerminalView(
+                            logs = logMessages,
+                            followBottom = followBottomState.value,
+                            onFollowBottomChange = { followBottomState.value = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
                 }

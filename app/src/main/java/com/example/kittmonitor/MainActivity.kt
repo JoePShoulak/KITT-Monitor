@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
     private val statusTextState = mutableStateOf("")
     private val isConnectedState = mutableStateOf(false)
     private val logMessages = mutableStateListOf<AnnotatedString>()
+    private val voltageData = mutableStateListOf<Pair<Long, Float>>()
     private val followBottomState = mutableStateOf(true)
 
     private val descriptorQueue = DescriptorWriteQueue()
@@ -54,6 +55,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        setOrientationAllowed(false)
 
         val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = manager.adapter
@@ -65,18 +68,21 @@ class MainActivity : ComponentActivity() {
                 isConnectedState = isConnectedState,
                 statusTextState = statusTextState,
                 logMessages = logMessages,
+                voltageData = voltageData,
                 followBottomState = followBottomState,
                 bluetoothAdapter = bluetoothAdapter,
                 saveLogsToFile = ::saveLogsToFile,
                 openLogsFolder = ::openLogsFolder,
                 hasPermission = ::hasPermission,
-                beginConnectionFlow = ::beginConnectionFlow
+                beginConnectionFlow = ::beginConnectionFlow,
+                setOrientationAllowed = ::setOrientationAllowed
             )
         }
     }
 
     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private fun beginConnectionFlow() {
+        setOrientationAllowed(false)
         statusTextState.value = "Searching..."
         isConnectedState.value = false
         followBottomState.value = true
@@ -158,11 +164,16 @@ class MainActivity : ComponentActivity() {
                             hasPermission = ::hasPermission,
                             descriptorQueue = descriptorQueue,
                             logMessages = logMessages,
+                            voltageData = voltageData,
                             isConnectedState = isConnectedState,
                             statusTextState = statusTextState,
                             attemptReconnect = { attemptFullConnection(onStatusChange, onDisconnected) },
                             onStatusChange = onStatusChange,
-                            onDisconnected = onDisconnected
+                            onConnected = { setOrientationAllowed(true) },
+                            onDisconnected = {
+                                setOrientationAllowed(false)
+                                onDisconnected()
+                            }
                         )
                     )
                 }
@@ -217,6 +228,13 @@ class MainActivity : ComponentActivity() {
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         startActivity(Intent.createChooser(intent, "Open file"))
+    }
+
+    private fun setOrientationAllowed(allow: Boolean) {
+        requestedOrientation = if (allow)
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        else
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
     @Deprecated("Deprecated in Java")

@@ -11,10 +11,12 @@ fun createGattCallback(
     hasPermission: () -> Boolean,
     descriptorQueue: DescriptorWriteQueue,
     logMessages: MutableList<AnnotatedString>,
+    voltageData: MutableList<Pair<Long, Float>>,
     isConnectedState: MutableState<Boolean>,
     statusTextState: MutableState<String>,
     attemptReconnect: () -> Unit,
     onStatusChange: (String) -> Unit,
+    onConnected: () -> Unit = {},
     onDisconnected: () -> Unit
 ): BluetoothGattCallback {
     fun handleServiceDiscovery(gatt: BluetoothGatt, status: Int) {
@@ -46,6 +48,7 @@ fun createGattCallback(
                 }
                 statusTextState.value = "KITT Monitor"
                 isConnectedState.value = true
+                onConnected()
             } else {
                 Log.w("KITTMonitor", "Target service not found, restarting...")
                 gatt.disconnect()
@@ -78,6 +81,11 @@ fun createGattCallback(
             Log.d("KITTMonitor", "Received update: $raw")
             val formatted = formatMessage(characteristic.uuid, raw)
             logMessages.add(formatted)
+            if (characteristic.uuid.toString().uppercase().endsWith("DA70")) {
+                raw.toFloatOrNull()?.let { v ->
+                    voltageData.add(System.currentTimeMillis() to v)
+                }
+            }
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
