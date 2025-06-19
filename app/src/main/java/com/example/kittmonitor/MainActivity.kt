@@ -243,7 +243,6 @@ class MainActivity : ComponentActivity() {
         scanner?.startScan(scanCallback)
     }
 
-
     @RequiresApi(Build.VERSION_CODES.O)
     private fun saveLogsToFile() {
         val text = logMessages.joinToString("\n") { it.text }
@@ -280,7 +279,6 @@ class MainActivity : ComponentActivity() {
         }
         startActivity(Intent.createChooser(intent, "Open file"))
     }
-
 
     @Deprecated("Deprecated in Java")
     @SuppressLint("MissingPermission")

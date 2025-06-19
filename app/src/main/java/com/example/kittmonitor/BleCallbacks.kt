@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.text.AnnotatedString
 import java.util.UUID
+import androidx.compose.ui.text.withStyle
 
 fun createGattCallback(
     hasPermission: () -> Boolean,
