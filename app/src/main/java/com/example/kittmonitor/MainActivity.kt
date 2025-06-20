@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
     private val descriptorQueue = DescriptorWriteQueue()
 
     private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        @SuppressLint("MissingPermission")
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
                 val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
@@ -195,6 +196,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun openLogsFolder() {
         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
         val uri: Uri = FileProvider.getUriForFile(this, "$packageName.provider", dir)
@@ -224,6 +226,7 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(intent, "Open file"))
     }
 
+    @SuppressLint("MissingPermission")
     override fun onResume() {
         super.onResume()
         registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
